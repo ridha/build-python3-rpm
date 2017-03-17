@@ -1,0 +1,33 @@
+FROM centos:7
+
+RUN yum groupinstall -y 'Development Tools' && \
+    yum -y install ruby-devel gcc curl libyaml-devel rpm-build make && \
+    gem install --no-ri --no-rdoc fpm && \
+    yum -y install openssl-devel readline-devel \
+    bzip2-devel sqlite-devel zlib-devel ncurses-devel libjpeg-devel \
+    db4-devel expat-devel gdbm-devel \
+    && mkdir -p /build/src
+
+WORKDIR /build
+COPY buildout.cfg /build
+COPY bootstrap.py /build
+COPY test_imports.py /build/src
+
+RUN python bootstrap.py && ./bin/buildout -vv && \
+    echo 'echo /usr/local/lib > /etc/ld.so.conf.d/usr-local-lib.conf' > /tmp/installdir/run-ldconfig.sh && \
+    echo '/sbin/ldconfig' >> /tmp/installdir/run-ldconfig.sh
+
+RUN bash -c "fpm -s dir -t rpm -n python -v 3.6.0 -C /tmp/installdir \
+    --after-install /tmp/installdir/run-ldconfig.sh \
+    -d 'openssl' \
+    -d 'bzip2' \
+    -d 'zlib' \
+    -d 'expat' \
+    -d 'sqlite' \
+    -d 'ncurses' \
+    -d 'readline' \
+    -d 'gdbm' \
+    -d 'libjpeg' \
+    --directories=/opt/py36/lib/python3.6/ \
+    --directories=/opt/py36/include/python3.6m/ \
+    opt/py36"
